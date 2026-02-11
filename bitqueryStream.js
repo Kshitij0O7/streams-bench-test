@@ -31,10 +31,29 @@ function startBitqueryStream(onData) {
                     Network: {is: "Solana"},
                     Address: {is: "${tokenAddress}"}
                   },
-                  Interval: {Time: {Duration: {eq: 60}}}
+                  Interval: {Time: {Duration: {eq: 1}}}
                 }
               ) {
-                Block { Timestamp }
+                Block { 
+                    Timestamp 
+                }
+                Interval{
+                    Time{
+                        Start
+                        Duration
+                    }
+                }
+                Price{
+                    Ohlc{
+                        Open
+                        High
+                        Low
+                        Close
+                    }
+                }
+                Volume{
+                    Usd
+                }
               }
             }
           }
@@ -45,15 +64,16 @@ function startBitqueryStream(onData) {
 
     if (response.type === "data") {
       const receivedAt = Date.now();
-      const timestamp =
-        response.payload.data.Trading.Tokens[0].Block.Timestamp;
+      const startTime = response.payload.data.Trading.Tokens[0].Interval.Time.Start;
+      const timestamp = new Date(startTime).getTime();
 
-      const blockTime = Number(timestamp) / 1e6; // ns → ms
-      const latency = receivedAt - blockTime;
+      const latency = receivedAt - timestamp;
+
+      const bucketSecond = Math.floor(timestamp / 1000);
 
       onData({
         provider: "bitquery",
-        blockTime,
+        bucketSecond,
         latency
       });
     }

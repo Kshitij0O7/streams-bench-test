@@ -18,9 +18,11 @@ function startBirdeyeStream(onData) {
           const blockTime = data.data.unixTime * 1000;
           const latency = receivedAt - blockTime;
 
+          const bucketSecond = blockTime/1000;
+
           onData({
             provider: "birdeye",
-            blockTime,
+            bucketSecond,
             latency
           });
         }
@@ -30,7 +32,7 @@ function startBirdeyeStream(onData) {
     const msg = {
       type: "SUBSCRIBE_PRICE",
       data: {
-        chartType: "1m",
+        chartType: "1s",
         currency: "usd",
         address: tokenAddress
       }
