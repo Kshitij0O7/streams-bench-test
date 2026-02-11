@@ -1,0 +1,19 @@
+{
+  "name": "latency-bench-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "csv-writer": "^1.6.0",
+    "dotenv": "^17.2.4",
+    "websocket": "^1.0.35",
+    "ws": "^8.19.0"
+  }
+}
