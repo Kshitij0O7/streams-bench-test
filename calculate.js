@@ -2,37 +2,46 @@ const fs = require("fs");
 const path = require("path");
 
 function calculateAverages() {
-  const filePath = path.join(__dirname, "latency.csv");
+  const filePath = path.join(__dirname, "latencyKafka.csv");
 
-  const lines = fs.readFileSync(filePath, "utf8")
+  const lines = fs
+    .readFileSync(filePath, "utf8")
     .split("\n")
-    .slice(1) // skip header
+    .slice(1)
     .filter(Boolean);
 
-  let birdeyeTotal = 0;
-  let bitqueryTotal = 0;
-  let birdeyeCount = 0;
-  let bitqueryCount = 0;
+  let wsTotal = 0;
+  let wsCount = 0;
+  let kafkaTotal = 0;
+  let kafkaCount = 0;
 
   lines.forEach(line => {
-    const [, birdeye, bitquery] = line.split(",");
+    const [, websocket, kafka] = line.split(",");
 
-    if (birdeye) {
-      birdeyeTotal += Number(birdeye);
-      birdeyeCount++;
+    if (websocket !== "") {
+      wsTotal += Number(websocket);
+      wsCount++;
     }
 
-    if (bitquery) {
-      bitqueryTotal += Number(bitquery);
-      bitqueryCount++;
+    if (kafka !== "") {
+      kafkaTotal += Number(kafka);
+      kafkaCount++;
     }
   });
 
   console.log("\n===== LATENCY RESULTS =====");
-  console.log("Birdeye Avg Latency:",
-    (birdeyeTotal / birdeyeCount).toFixed(2), "ms");
-  console.log("Bitquery Avg Latency:",
-    (bitqueryTotal / bitqueryCount).toFixed(2), "ms");
+
+  console.log(
+    "WebSocket Avg Latency:",
+    wsCount ? (wsTotal / wsCount).toFixed(2) : "N/A",
+    "ms"
+  );
+
+  console.log(
+    "Kafka Avg Latency:",
+    kafkaCount ? (kafkaTotal / kafkaCount).toFixed(2) : "N/A",
+    "ms"
+  );
 }
 
 module.exports = calculateAverages;

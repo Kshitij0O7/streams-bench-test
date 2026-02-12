@@ -11,8 +11,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bitquery-protobuf-schema": "^3.1.2",
+    "bs58": "^6.0.0",
     "csv-writer": "^1.6.0",
     "dotenv": "^17.2.4",
+    "fs": "^0.0.1-security",
+    "kafkajs": "^2.2.3",
+    "kafkajs-lz4": "^1.2.1",
+    "lz4": "^0.6.5",
+    "lz4-asm": "^0.4.2",
+    "uuid": "^13.0.0",
     "websocket": "^1.0.35",
     "ws": "^8.19.0"
   }

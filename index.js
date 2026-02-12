@@ -1,9 +1,12 @@
 require("dotenv").config();
 
-const startBirdeyeStream = require("./birdeyeStream");
 const startBitqueryStream = require("./bitqueryStream");
+const startKafkaStream = require("./kafkaStream");
 const appendRow = require("./saveFile");
 const calculateAverages = require("./calculate");
+
+const store = {};
+const TIMEOUT_MS = 6000; // Give Kafka + WS enough sync time
 
 /*
   store structure:
@@ -11,25 +14,20 @@ const calculateAverages = require("./calculate");
   {
     [bucketSecond]: {
         createdAt: timestamp,
-        birdeye: latency,
-        bitquery: latency
+        websocket: latency,
+        kafka: latency
     }
   }
 */
 
-const store = {};
-const TIMEOUT_MS = 4000; // Flush bucket after 4 seconds if incomplete
-
 function handleData({ provider, bucketSecond, latency }) {
-
-  // Initialize bucket if not present
   if (!store[bucketSecond]) {
     store[bucketSecond] = {
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
   }
 
-  // Only store first latency per provider per second
+  // Only record first latency per provider per second
   if (store[bucketSecond][provider] === undefined) {
     store[bucketSecond][provider] = latency;
   }
@@ -41,24 +39,17 @@ function checkAndFlush(bucketSecond) {
   const entry = store[bucketSecond];
   if (!entry) return;
 
-  const hasBirdeye = entry.birdeye !== undefined;
-  const hasBitquery = entry.bitquery !== undefined;
+  const hasWebsocket = entry.websocket !== undefined;
+  const hasKafka = entry.kafka !== undefined;
   const isTimedOut = Date.now() - entry.createdAt > TIMEOUT_MS;
 
-  // Flush if both providers responded OR timeout reached
-  if ((hasBirdeye && hasBitquery) || isTimedOut) {
-
-    appendRow(
-      bucketSecond,
-      entry.birdeye,
-      entry.bitquery
-    );
-
+  if ((hasWebsocket && hasKafka) || isTimedOut) {
+    appendRow(bucketSecond, entry.websocket, entry.kafka);
     delete store[bucketSecond];
   }
 }
 
-// Periodic cleanup in case flush not triggered automatically
+// Periodic cleanup to avoid stale buckets
 setInterval(() => {
   Object.keys(store).forEach(bucketSecond => {
     checkAndFlush(bucketSecond);
@@ -66,22 +57,22 @@ setInterval(() => {
 }, 1000);
 
 // Start both streams simultaneously
-startBirdeyeStream(handleData);
 startBitqueryStream(handleData);
+const stopKafka = startKafkaStream(handleData);
 
 // Graceful shutdown
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("\nStopping benchmark...");
 
-  // Flush any remaining buckets
+  // Flush remaining entries
   Object.keys(store).forEach(bucketSecond => {
     const entry = store[bucketSecond];
-    appendRow(
-      bucketSecond,
-      entry.birdeye,
-      entry.bitquery
-    );
+    appendRow(bucketSecond, entry.websocket, entry.kafka);
   });
+
+  if (stopKafka) {
+    await stopKafka();
+  }
 
   calculateAverages();
   process.exit();

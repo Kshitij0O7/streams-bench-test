@@ -1,15 +1,18 @@
 const fs = require("fs");
 const path = require("path");
 
-const filePath = path.join(__dirname, "latency.csv");
+const filePath = path.join(__dirname, "latencyKafka.csv");
 
-// Create file if not exists
+// Create file with header if not exists
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, "BlockTime,BirdeyeLatency,BitqueryLatency\n");
+  fs.writeFileSync(
+    filePath,
+    "BucketSecond,WebsocketLatency,KafkaLatency\n"
+  );
 }
 
-function appendRow(blockTime, birdeyeLatency, bitqueryLatency) {
-  const row = `${blockTime},${birdeyeLatency || ""},${bitqueryLatency || ""}\n`;
+function appendRow(bucketSecond, websocketLatency, kafkaLatency) {
+  const row = `${bucketSecond},${websocketLatency ?? ""},${kafkaLatency ?? ""}\n`;
   fs.appendFileSync(filePath, row);
 }
 
