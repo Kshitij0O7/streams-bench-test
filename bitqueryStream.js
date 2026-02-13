@@ -23,58 +23,37 @@ function startBitqueryStream(onData) {
         id: "1",
         payload: {
           query: `
-          subscription {
-            Trading {
-              Tokens(
-                where: {
-                  Token: {
-                    Network: {is: "Solana"},
-                    Address: {is: "${tokenAddress}"}
-                  },
-                  Interval: {Time: {Duration: {eq: 1}}}
-                }
-              ) {
-                Block { 
-                    Timestamp 
-                }
-                Interval{
-                    Time{
-                        Start
-                        Duration
+            subscription {
+              Solana {
+                TokenSupplyUpdates(
+                  where: {Instruction: {Program: {Address: {is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"}, Method: {in: ["create","create_v2"]}}}}
+                ) {
+                  Block{
+                    Time
+                  }
+                  TokenSupplyUpdate {
+                    Currency {
+                      Symbol
+                      Name
+                      MintAddress
+                      Decimals
                     }
-                }
-                Price{
-                    Ohlc{
-                        Open
-                        High
-                        Low
-                        Close
-                    }
-                }
-                Volume{
-                    Usd
+                    PostBalance
+                  }
                 }
               }
             }
-          }
           `
         }
       }));
     }
 
     if (response.type === "data") {
-      const receivedAt = Date.now();
-      const startTime = response.payload.data.Trading.Tokens[0].Interval.Time.Start;
-      const timestamp = new Date(startTime).getTime();
-
-      const latency = receivedAt - timestamp;
-
-      const bucketSecond = Math.floor(timestamp / 1000);
+      const token = response.payload.data.Solana.TokenSupplyUpdates[0].TokenSupplyUpdate.Currency.MintAddress;
 
       onData({
         provider: "bitquery",
-        bucketSecond,
-        latency
+        token,
       });
     }
   });

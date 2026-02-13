@@ -3,7 +3,7 @@ require("dotenv").config();
 const startBirdeyeStream = require("./birdeyeStream");
 const startBitqueryStream = require("./bitqueryStream");
 const appendRow = require("./saveFile");
-const calculateAverages = require("./calculate");
+// const calculateAverages = require("./calculate");
 
 /*
   store structure:
@@ -20,25 +20,24 @@ const calculateAverages = require("./calculate");
 const store = {};
 const TIMEOUT_MS = 4000; // Flush bucket after 4 seconds if incomplete
 
-function handleData({ provider, bucketSecond, latency }) {
+function handleData({ provider, token, recieveAt }) {
 
   // Initialize bucket if not present
-  if (!store[bucketSecond]) {
-    store[bucketSecond] = {
+  if (!store[token]) {
+    store[token] = {
       createdAt: Date.now()
     };
   }
 
-  // Only store first latency per provider per second
-  if (store[bucketSecond][provider] === undefined) {
-    store[bucketSecond][provider] = latency;
+  if (store[token][provider] === undefined) {
+    store[token][provider] = true;
   }
 
-  checkAndFlush(bucketSecond);
+  checkAndFlush(token);
 }
 
-function checkAndFlush(bucketSecond) {
-  const entry = store[bucketSecond];
+function checkAndFlush(token) {
+  const entry = store[token];
   if (!entry) return;
 
   const hasBirdeye = entry.birdeye !== undefined;
@@ -49,19 +48,19 @@ function checkAndFlush(bucketSecond) {
   if ((hasBirdeye && hasBitquery) || isTimedOut) {
 
     appendRow(
-      bucketSecond,
+      token,
       entry.birdeye,
       entry.bitquery
     );
 
-    delete store[bucketSecond];
+    delete store[token];
   }
 }
 
 // Periodic cleanup in case flush not triggered automatically
 setInterval(() => {
-  Object.keys(store).forEach(bucketSecond => {
-    checkAndFlush(bucketSecond);
+  Object.keys(store).forEach(token => {
+    checkAndFlush(token);
   });
 }, 1000);
 
@@ -74,15 +73,15 @@ process.on("SIGINT", () => {
   console.log("\nStopping benchmark...");
 
   // Flush any remaining buckets
-  Object.keys(store).forEach(bucketSecond => {
-    const entry = store[bucketSecond];
+  Object.keys(store).forEach(token => {
+    const entry = store[token];
     appendRow(
-      bucketSecond,
+      token,
       entry.birdeye,
       entry.bitquery
     );
   });
 
-  calculateAverages();
+  // calculateAverages();
   process.exit();
 });

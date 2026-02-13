@@ -4,39 +4,30 @@ function startBirdeyeStream(onData) {
   const client = new WebSocketClient();
 
   const apiKey = process.env.BIRDEYE_API_KEY;
-  const tokenAddress = process.env.TOKEN_ADDRESS;
   const chain = process.env.CHAIN;
 
   client.on('connect', function (connection) {
 
     connection.on('message', function (message) {
       if (message.type === 'utf8') {
-        const receivedAt = Date.now();
         const data = JSON.parse(message.utf8Data);
 
-        if (data?.data?.unixTime) {
-          const blockTime = data.data.unixTime * 1000;
-          const latency = receivedAt - blockTime;
-
-          const bucketSecond = blockTime/1000;
+        if (data?.data?.address) {
+          const token = data.data.address;
 
           onData({
             provider: "birdeye",
-            bucketSecond,
-            latency
+            token,
           });
         }
       }
     });
 
     const msg = {
-      type: "SUBSCRIBE_PRICE",
-      data: {
-        chartType: "1s",
-        currency: "usd",
-        address: tokenAddress
-      }
-    };
+      "type": "SUBSCRIBE_TOKEN_NEW_LISTING",
+      "meme_platform_enabled": true,
+      "sources": ["pump_dot_fun"],
+  }
 
     connection.send(JSON.stringify(msg));
   });
