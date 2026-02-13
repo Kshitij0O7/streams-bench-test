@@ -1,59 +1,45 @@
-# Websocket Streams Latency Benchmark — Bitquery vs Birdeye
+# Token Listing Coverage Benchmark — Bitquery vs Birdeye
 
-This repository contains a reproducible benchmark framework for comparing **websocket streams latency** between:
+This repository contains a benchmark framework for comparing **token listing detection coverage** between:
 
-* **Birdeye WebSocket OHLCV Stream**
-* **Bitquery Trading Stream**
+* **Birdeye WebSocket Token New Listing Stream**
+* **Bitquery Token Supply Updates Stream**
 
-The goal is to measure **end-to-end latency** in a fair, technically defensible way under identical system and network conditions.
+The goal is to measure which provider detects new token listings (specifically from pump.fun) first and how comprehensive their coverage is.
 
 # 📌 What This Benchmark Measures
 
+This benchmark tracks which provider detects new token listings from pump.fun:
 
-For each 1-second OHLCV interval, we measure:
+* **Birdeye**: Subscribes to `SUBSCRIBE_TOKEN_NEW_LISTING` with `meme_platform_enabled: true` and `sources: ["pump_dot_fun"]`
+* **Bitquery**: Subscribes to `TokenSupplyUpdates` for tokens created via the pump.fun program (`6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`)
 
-```
-Latency = Time message received by client - Interval start time
-```
+For each token detected, the benchmark records:
+- Whether Birdeye detected it (`true` or empty)
+- Whether Bitquery detected it (`true` or empty)
 
-Where:
-
-* **Birdeye**
-
-  * Uses `unixTime` (seconds) from `PRICE_DATA`
-  * Converted to milliseconds
-
-* **Bitquery**
-
-  * Uses `Interval.Time.Start` (ISO format)
-  * Converted to Unix milliseconds
-
-Both providers are normalized to a common:
-
-```
-bucketSecond = epoch second
-```
-
-Each second is treated as a unique key.
+The system uses a token-based matching approach:
+- Each token address serves as a unique key
+- Both providers' responses are matched by token address
+- A 4-second timeout ensures incomplete matches are still recorded
+- Periodic cleanup prevents memory leaks
 
 ---
 
 # 🧠 Why This Methodology Matters
 
-Naively measuring latency using block timestamps can be misleading due to:
+Comparing token listing detection across providers requires:
 
-* Candle start vs candle close semantics
-* Nanoseconds vs seconds mismatch
-* Multiple updates per interval
-* Aggregation timing differences
+* **Fair matching**: Both providers must detect the same token for a valid comparison
+* **Timeout handling**: Some tokens may only be detected by one provider
+* **Deduplication**: The same token may be detected multiple times
+* **Normalization**: Raw CSV output may contain duplicates that need cleaning
 
 This benchmark:
-
-* Aligns timestamps properly
-* Uses 1-second OHLCV interval start time
-* Ensures one entry per provider per second
-* Handles duplicate emissions safely
-* Uses timeout-based flush for incomplete seconds
+- Matches tokens by address across both providers
+- Handles cases where only one provider detects a token
+- Uses timeout-based flush to prevent missing data
+- Includes a deduplication script to normalize results
 
 This makes the results:
 
@@ -63,7 +49,7 @@ This makes the results:
 
 ✔ Reproducible
 
-✔ Publishable
+✔ Normalized (after running dedupe.js)
 
 ---
 
@@ -71,13 +57,13 @@ This makes the results:
 
 ```
 .
-├── index.js               # Entry point
+├── index.js               # Entry point and token matching logic
 ├── birdeyeStream.js       # Birdeye WebSocket stream logic
-├── bitqueryStream.js      # Bitquery Websocket stream logic
+├── bitqueryStream.js      # Bitquery WebSocket stream logic
 ├── saveFile.js            # CSV writer
-├── calculate.js           # Average latency calculator
+├── dedupe.js              # CSV normalization and deduplication script
 ├── .env                   # API keys (not committed)
-└── latency.csv            # Output file (auto-generated)
+└── coverage.csv           # Output file (auto-generated)
 ```
 
 ---
@@ -110,11 +96,12 @@ Dependencies used:
 ```env
 BIRDEYE_API_KEY=your_birdeye_key
 BITQUERY_TOKEN=your_bitquery_token
-TOKEN_ADDRESS=token_address_here
 CHAIN=solana
 ```
 
 > ⚠️ WebSocket streaming on Birdeye requires a paid plan.
+
+> ⚠️ Note: `TOKEN_ADDRESS` is no longer required as we're subscribing to new listings, not a specific token.
 
 ---
 
@@ -132,28 +119,53 @@ CTRL + C
 
 On exit, the script will:
 
-* Flush remaining interval data
-* Calculate and print average latency
-* Preserve full dataset in `latency.csv`
+* Flush any remaining token data
+* Preserve full dataset in `coverage.csv`
+
+---
+
+## 5️⃣ Normalize CSV Output
+
+**Important**: After ending the program, run the deduplication script to normalize the CSV file:
+
+```bash
+node dedupe.js
+```
+
+This script will:
+- Remove duplicate token entries
+- Merge coverage data for the same token (if detected multiple times)
+- Overwrite `coverage.csv` with normalized data
+- Display statistics about missing coverage
 
 ---
 
 # 📊 Output Format
 
-`latency.csv`:
+`coverage.csv` (before deduplication):
 
 ```
-BucketSecond,BirdeyeLatency,BitqueryLatency
-1770817574,2477,1089
-1770817580,,1015
-1770817583,2872,1567
+TokenAddress,Birdeye,Bitquery
+7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,true,
+7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,true,true
+AbC123...,true,true
+...
+```
+
+`coverage.csv` (after running `dedupe.js`):
+
+```
+TokenAddress,Birdeye,Bitquery
+7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,true,true
+AbC123...,true,true
 ...
 ```
 
 Where:
 
-* `BucketSecond` = epoch second
-* Latencies = milliseconds
+* `TokenAddress` = Solana token mint address
+* `Birdeye` = `true` if Birdeye detected the token, empty otherwise
+* `Bitquery` = `true` if Bitquery detected the token, empty otherwise
 
 ---
 
@@ -161,17 +173,19 @@ Where:
 
 Typical observations:
 
-* Bitquery may emit multiple updates per second
-* Only first latency per provider per second is recorded
-* Birdeye may skip seconds with no trades
-* Network jitter can influence results
+* Some tokens may be detected by both providers
+* Some tokens may only be detected by one provider
+* The same token may appear multiple times in the raw CSV (before deduplication)
+* Network conditions and provider processing times can affect detection order
+* Timeout mechanism (4 seconds) ensures incomplete matches are still recorded
 
-Latency ranges depend on:
+Coverage differences depend on:
 
+* Provider indexing speed
 * Network conditions
-* Token activity
-* Provider internal aggregation logic
-* System clock accuracy
+* Token creation volume
+* Provider filtering logic
+* System processing delays
 
 ---
 
@@ -182,34 +196,36 @@ To ensure fair comparison:
 * Both streams run simultaneously
 * Same machine
 * Same network
-* Same token
-* Same interval (1s)
-* Timestamp normalization applied
-* Duplicate second emissions ignored
-* Timeout flush prevents missing rows
+* Same source (pump.fun token listings)
+* Token-based matching (not time-based)
+* Timeout flush (4 seconds) prevents missing rows
+* Deduplication script normalizes final results
 
 ---
 
 # ⚠️ Important Considerations
 
-### 1️⃣ 1-Second OHLC Support
+### 1️⃣ Pump.fun Token Listings
 
-Birdeye currently supports 1s OHLC primarily on Solana.
+This benchmark specifically tests detection of new tokens created via pump.fun on Solana.
 
-### 2️⃣ Timestamp Semantics
+### 2️⃣ Token Matching
 
-* Birdeye `unixTime` = interval start (seconds)
-* Bitquery `Interval.Time.Start` = ISO timestamp
+* Tokens are matched by their mint address
+* Both providers must detect the same token for a complete match
+* Incomplete matches (only one provider) are still recorded
 
-Both are normalized to epoch seconds.
+### 3️⃣ Deduplication Required
 
-### 3️⃣ Not Measuring:
+The raw `coverage.csv` file may contain duplicate entries for the same token. Always run `node dedupe.js` after ending the program to get normalized results.
 
-* Ping time
-* WebSocket handshake latency
-* Raw block propagation delay
+### 4️⃣ Not Measuring:
 
-Only **application-level OHLCV streaming latency**.
+* Latency between detection times
+* Block propagation delay
+* WebSocket handshake time
+
+Only **token listing detection coverage** is measured.
 
 ---
 
@@ -217,26 +233,31 @@ Only **application-level OHLCV streaming latency**.
 
 You may extend this benchmark to:
 
-* Measure P50 / P95 / P99
-* Compare first-arrival per interval
-* Benchmark trade stream latency
-* Test under load (multiple tokens)
-* Run long-duration (30+ min)
-* Deploy on VPS for cleaner network conditions
+* Measure detection latency (time difference between providers)
+* Compare coverage across different meme platforms
+* Test under high-volume conditions
+* Run long-duration tests (hours/days)
+* Analyze false positives/negatives
+* Compare detection rates by token characteristics
 
 ---
 
-# 📌 Results
+# 📌 Example Results
+
+After running the benchmark and `dedupe.js`:
 
 ```
-===== LATENCY RESULTS =====
-Birdeye Avg Latency: 2330.80 ms
-Bitquery Avg Latency: 1664.10 ms
+✅ Deduplication complete (file overwritten)
+Total unique tokens: 1523
+Missing Birdeye: 45
+Missing Bitquery: 89
 ```
 
-After correcting timestamp alignment to interval start time:
-
-Expected values are typically much closer and more realistic.
+This indicates:
+- 1523 unique tokens were detected
+- 45 tokens were only detected by Bitquery
+- 89 tokens were only detected by Birdeye
+- The remaining tokens were detected by both providers
 
 ---
 
@@ -250,19 +271,19 @@ MIT License
 
 Pull requests welcome.
 
-If you improve methodology (e.g., percentile calculation, statistical tests, visualization), contributions are appreciated.
+If you improve methodology (e.g., detection latency measurement, statistical analysis, visualization), contributions are appreciated.
 
 ---
 
 # 📣 Disclaimer
 
-This benchmark measures latency under specific conditions and should not be interpreted as a universal performance guarantee. Results vary based on:
+This benchmark measures coverage under specific conditions and should not be interpreted as a universal performance guarantee. Results vary based on:
 
-* Network
-* Token
-* Chain
+* Network conditions
+* Token creation volume
+* Chain activity
 * Time of day
 * Provider infrastructure
+* Filtering and indexing logic
 
 Always run independent tests for your own production evaluation.
-
