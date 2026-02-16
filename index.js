@@ -1,7 +1,7 @@
 require("dotenv").config();
 
-const startBirdeyeStream = require("./birdeyeStream");
-const startBitqueryStream = require("./bitqueryStream");
+// const startBirdeyeStream = require("./birdeyeStream");
+// const startBitqueryStream = require("./bitqueryStream");
 const appendRow = require("./saveFile");
 // const calculateAverages = require("./calculate");
 
@@ -16,6 +16,10 @@ const appendRow = require("./saveFile");
     }
   }
 */
+const providers = [
+  require("./birdeyeStream"),
+  require("./bitqueryStream")
+];
 
 const store = {};
 const TIMEOUT_MS = 4000; // Flush bucket after 4 seconds if incomplete
@@ -65,8 +69,9 @@ setInterval(() => {
 }, 1000);
 
 // Start both streams simultaneously
-startBirdeyeStream(handleData);
-startBitqueryStream(handleData);
+// startBirdeyeStream(handleData);
+// startBitqueryStream(handleData);
+providers.forEach(start => start(handleData));
 
 // Graceful shutdown
 process.on("SIGINT", () => {
