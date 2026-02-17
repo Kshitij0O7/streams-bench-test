@@ -72,50 +72,31 @@ function startKafkaStream(onData) {
       autoCommit: false,
       eachMessage: async ({ message }) => {
         try {
-
           const buffer = message.value;
           const decoded = ParsedMessage.decode(buffer);
           const msgObj = ParsedMessage.toObject(decoded, {
             bytes: Buffer,
           });
 
-        //   console.log(msgObj.Transactions[0].ParsedIdlInstructions);
           const transactions = msgObj.Transactions;
           if (!transactions || !Array.isArray(transactions)) return;
 
           for (const transaction of transactions) {
-              // console.log(transaction.ParsedIdlInstructions[0]);
-            // console.log("===================================================");
               
             const program = transaction?.ParsedIdlInstructions[0]?.Program;
-            const methods = ["create", "create_v2"];
+            const methods = ["create", "create_v2", "set_creator"];
             const programAddress = convertBytes(program.Address)
-            if(programAddress == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"){
-                console.log(program.Method);
-            }
-            
-            // if (convertBytes(program.Address) != "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" || !methods.includes(program.Method)) continue;
+
+            if (programAddress != "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" || !methods.includes(program.Method)) continue;
               
-            // // printProtobufMessage(transaction)
-            // const accounts = transaction.ParsedIdlInstructions[0].Accounts;
-            // // for(const account of accounts){
-            // //     console.log(convertBytes(account.Address));
-            // // }
-            // const token = accounts[0].Address
-            // console.log(convertBytes(token));
-            // // console.log({address: convertBytes(program.Address), method:program.Method, args:program.Arguments});
-            // console.log("===================================================");
+            const accounts = transaction.ParsedIdlInstructions[0].Accounts;
+            const token = accounts[0].Address;
             
-            // onData({
-                //   provider: "kafka",
-                //   bucketSecond,
-            //   latency,
-            // });
-
-            // Only first interval per message needed
-            break;
+            onData({
+                  provider: "kafka",
+                  token,
+            });
           }
-
         } catch (err) {
           console.error("Kafka decode error:", err);
         }
@@ -132,5 +113,5 @@ function startKafkaStream(onData) {
   };
 }
 
-startKafkaStream();
-// module.exports = startKafkaStream;
+// startKafkaStream();
+module.exports = startKafkaStream;
