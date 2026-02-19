@@ -66,8 +66,8 @@ setInterval(() => {
 }, 1000);
 
 // Start both streams simultaneously
+startBitqueryStream(handleData);ß
 startBirdeyeStream(handleData);
-startBitqueryStream(handleData);
 
 // Graceful shutdown
 process.on("SIGINT", () => {

@@ -1,3 +1,5 @@
+const { tokens } = require('./tokenList');
+
 const WebSocketClient = require('websocket').client;
 
 function startBirdeyeStream(onData) {
@@ -29,13 +31,16 @@ function startBirdeyeStream(onData) {
       }
     });
 
+    const query = tokens.map(
+      (token) =>
+        `(address = ${token} AND chartType = 1s AND currency = usd)`
+    ).join(" OR ");
+
     const msg = {
       "type": "SUBSCRIBE_PRICE",
       "data": {
-          "queryType": "simple",
-          "chartType": "1s",
-          "address": "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm",
-          "currency": "pair"
+          "queryType": "complex",
+          "query": query,
       }
     };
 
