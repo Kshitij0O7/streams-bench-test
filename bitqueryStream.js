@@ -1,11 +1,9 @@
 const { WebSocket } = require("ws");
-const {tokens} = require("./tokenList");
 
 function startBitqueryStream(onData) {
 
   const token = process.env.BITQUERY_TOKEN;
   const tokenAddress = process.env.TOKEN_ADDRESS;
-  const tokensList = tokens.map(token => `"${token}"`).join(', ');
 
   const bitqueryConnection = new WebSocket(
     `wss://streaming.bitquery.io/eap?token=${token}`,
@@ -25,34 +23,34 @@ function startBitqueryStream(onData) {
         id: "1",
         payload: {
           query: `
-            subscription {
-              Trading {
-                Tokens(
-                  where: {Interval: {Time: {Duration: {eq: 1}}}, Token: {Address: {in: [${tokensList}]}}}
-                ) {
-                  Block {
-                    Timestamp
-                  }
-                  Interval {
-                    Time {
-                      Start
-                      Duration
-                    }
-                  }
-                  Price {
-                    Ohlc {
-                      Open
-                      High
-                      Low
-                      Close
-                    }
-                  }
-                  Volume {
-                    Usd
-                  }
-                }
-              }
-            }
+          subscription {
+  Trading {
+    Pairs(
+      where: {Interval: {Time: {Duration: {eq: 1}}}, Market: {Network: {is: "Solana"}, Address: {is: "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"}}}
+    ) {
+      Block {
+        Timestamp
+      }
+      Interval {
+        Time {
+          Start
+          Duration
+        }
+      }
+      Price {
+        Ohlc {
+          Open
+          High
+          Low
+          Close
+        }
+      }
+      Volume {
+        Usd
+      }
+    }
+  }
+}
           `
         }
       }));
@@ -60,7 +58,7 @@ function startBitqueryStream(onData) {
 
     if (response.type === "data") {
       const receivedAt = Date.now();
-      const startTime = response.payload.data.Trading.Tokens[0].Interval.Time.Start;
+      const startTime = response.payload.data.Trading.Pairs[0].Interval.Time.Start;
       const timestamp = new Date(startTime).getTime();
 
       const latency = receivedAt - timestamp;
