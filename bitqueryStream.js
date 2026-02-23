@@ -24,33 +24,33 @@ function startBitqueryStream(onData) {
         payload: {
           query: `
           subscription {
-  Trading {
-    Pairs(
-      where: {Interval: {Time: {Duration: {eq: 1}}}, Market: {Network: {is: "Solana"}, Address: {is: "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"}}}
-    ) {
-      Block {
-        Timestamp
-      }
-      Interval {
-        Time {
-          Start
-          Duration
-        }
-      }
-      Price {
-        Ohlc {
-          Open
-          High
-          Low
-          Close
-        }
-      }
-      Volume {
-        Usd
-      }
-    }
-  }
-}
+            Trading {
+              Pairs(
+                where: {Interval: {Time: {Duration: {eq: 1}}}, Token: {Address: {is: "4nURS6qxY9bCEhramG2VZfnphJZyzis5EE86w5qLpump"}}, QuoteToken: {Address: {is: "So11111111111111111111111111111111111111112"}}}
+              ) {
+                Block {
+                  Timestamp
+                }
+                Interval {
+                  Time {
+                    Start
+                    Duration
+                  }
+                }
+                Price {
+                  Ohlc {
+                    Open
+                    High
+                    Low
+                    Close
+                  }
+                }
+                Volume {
+                  Usd
+                }
+              }
+            }
+          }
           `
         }
       }));

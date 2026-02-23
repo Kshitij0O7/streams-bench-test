@@ -29,14 +29,13 @@ function startBirdeyeStream(onData) {
       }
     });
 
-    const msg = {
-      "type": "SUBSCRIBE_PRICE",
-      "data": {
-          "queryType": "simple",
-          "chartType": "1s",
-          "address": "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm",
-          "currency": "pair"
-      }
+    const msg = {  
+      "type": "SUBSCRIBE_BASE_QUOTE_PRICE",  
+      "data": {  
+        "baseAddress": "4nURS6qxY9bCEhramG2VZfnphJZyzis5EE86w5qLpump",  
+        "quoteAddress": "So11111111111111111111111111111111111111112",  
+        "chartType": "1m"  
+      }  
     };
 
     connection.send(JSON.stringify(msg));
