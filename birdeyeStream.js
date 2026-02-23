@@ -12,8 +12,8 @@ function startBirdeyeStream(onData) {
       if (message.type === 'utf8') {
         const data = JSON.parse(message.utf8Data);
 
-        if (data?.data?.address) {
-          const token = data.data.address;
+        if (data?.data?.txHash) {
+          const token = data.data.txHash;
 
           onData({
             provider: "birdeye",
@@ -24,13 +24,16 @@ function startBirdeyeStream(onData) {
     });
 
     const msg = {
-      "type": "SUBSCRIBE_TOKEN_NEW_LISTING",
-      "meme_platform_enabled": true,
-      "sources": ["pump_dot_fun"],
-  }
+      "type": "SUBSCRIBE_TXS",
+      "data": {
+          "queryType": "simple",
+          "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+          "txsType": "all"
+      }
+    };
 
     connection.send(JSON.stringify(msg));
-  });
+    });
 
   client.connect(
     `wss://public-api.birdeye.so/socket/${chain}?x-api-key=${apiKey}`,

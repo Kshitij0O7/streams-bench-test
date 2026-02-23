@@ -25,20 +25,11 @@ function startBitqueryStream(onData) {
           query: `
             subscription {
               Solana {
-                TokenSupplyUpdates(
-                  where: {Instruction: {Program: {Address: {is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"}, Method: {in: ["create","create_v2"]}}}}
+                Transfers(
+                  where: {Transfer: {Currency: {MintAddress: {is: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"}}}}
                 ) {
-                  Block{
-                    Time
-                  }
-                  TokenSupplyUpdate {
-                    Currency {
-                      Symbol
-                      Name
-                      MintAddress
-                      Decimals
-                    }
-                    PostBalance
+                  Transaction {
+                    Signature
                   }
                 }
               }
@@ -49,7 +40,7 @@ function startBitqueryStream(onData) {
     }
 
     if (response.type === "data") {
-      const token = response.payload.data.Solana.TokenSupplyUpdates[0].TokenSupplyUpdate.Currency.MintAddress;
+      const token = response.payload.data.Solana.Transfers[0].Transaction.Signature;
 
       onData({
         provider: "bitquery",

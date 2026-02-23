@@ -14,7 +14,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 
-const COVERAGE_CSV = path.join(__dirname, "coverage.csv");
+const COVERAGE_CSV = path.join(__dirname, "coverage1.csv");
 const MISSING_OUT = path.join(__dirname, "missingTokens.txt");
 const BITQUERY_TOKEN = process.env.BITQUERY_TOKEN || ""; // put token in env, not hardcoded
 
@@ -87,18 +87,57 @@ function buildQuery(mint) {
   return `
 {
   Solana {
-    TokenSupplyUpdates(
-      where: {
-        TokenSupplyUpdate: {Currency: {MintAddress: {is: "${mint}"}}},
-        Instruction: {Program: {Address: {is: "${CREATE_PROGRAM}"}, Method: {in: ["${CREATE_METHODS[0]}", "${CREATE_METHODS[1]}"]}}}
-      }
+    DEXPools(
+      where: {Pool: {Market: {BaseCurrency: {MintAddress: {is: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"}}}}, Transaction: {Result: {Success: true}, Signature: {is: "${mint}"}}}
     ) {
-      Block { Time }
-      Transaction { Signer Signature }
-      TokenSupplyUpdate {
-        Amount
-        Currency { MintAddress Symbol Name ProgramAddress }
-        PostBalance
+      Block {
+        Time
+      }
+      Transaction {
+        Signature
+      }
+      Pool {
+        Market {
+          MarketAddress
+          BaseCurrency {
+            MintAddress
+            Symbol
+            Name
+            Decimals
+          }
+          QuoteCurrency {
+            MintAddress
+            Symbol
+            Name
+            Decimals
+          }
+        }
+        Dex {
+          ProgramAddress
+          ProtocolName
+          ProtocolFamily
+        }
+        Base {
+          ChangeAmount
+          ChangeAmountInUSD
+          PostAmount
+          PostAmountInUSD
+          Price
+          PriceInUSD
+        }
+        Quote {
+          ChangeAmount
+          ChangeAmountInUSD
+          PostAmount
+          PostAmountInUSD
+          Price
+          PriceInUSD
+        }
+      }
+      Instruction {
+        Program {
+          Method
+        }
       }
     }
   }
@@ -151,7 +190,7 @@ async function postBitquery(query, attempt = 0) {
 async function isMissingByQuery(mint) {
   const query = buildQuery(mint);
   const json = await postBitquery(query);
-  const updates = json?.data?.Solana?.TokenSupplyUpdates;
+  const updates = json?.data?.Solana?.DEXPools;
   return !Array.isArray(updates) || updates.length === 0;
 }
 
