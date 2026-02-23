@@ -28,7 +28,7 @@ function startBirdeyeStream(onData) {
       "data": {
           "queryType": "simple",
           "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-          "txsType": "all"
+          "txsType": "swap"
       }
     };
 
