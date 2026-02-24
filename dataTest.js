@@ -7,24 +7,26 @@ const CHAIN = "solana";
 const BIRDEYE_API_KEY = process.env.BIRDEYE_API_KEY;
 const BITQUERY_TOKEN = process.env.BITQUERY_TOKEN;
 
-const HOURS = 24;
+const HOURS = 48;
 const DURATION_SECONDS = 60;
 const DEVIATION_THRESHOLD = 0.02; // 2% deviation considered anomaly
 
-const OUT_FILE = path.join(__dirname, "deviations.csv");
+const OUT_FILE = path.join(__dirname, "deviations2days.csv");
 
-// Create deviations file (overwrite each run)
-fs.writeFileSync(
-  OUT_FILE,
-  [
-    "TimestampISO",
-    "Field",
-    "DeviationPct",
-    "BirdeyeValue",
-    "BitqueryValue",
-    "Token",
-  ].join(",") + "\n"
-);
+// Create file only if it does not exist
+if (!fs.existsSync(OUT_FILE)) {
+  fs.writeFileSync(
+    OUT_FILE,
+    [
+      "TimestampISO",
+      "Field",
+      "DeviationPct",
+      "BirdeyeValue",
+      "BitqueryValue",
+      "Token",
+    ].join(",") + "\n"
+  );
+}
 
 // ----------------------------------
 // Utility
