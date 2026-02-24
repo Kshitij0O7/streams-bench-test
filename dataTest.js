@@ -1,4 +1,6 @@
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 
 const TOKEN = process.env.TOKEN_ADDRESS; // set in .env
 const CHAIN = "solana";
@@ -8,6 +10,21 @@ const BITQUERY_TOKEN = process.env.BITQUERY_TOKEN;
 const HOURS = 24;
 const DURATION_SECONDS = 60;
 const DEVIATION_THRESHOLD = 0.02; // 2% deviation considered anomaly
+
+const OUT_FILE = path.join(__dirname, "deviations.csv");
+
+// Create deviations file (overwrite each run)
+fs.writeFileSync(
+  OUT_FILE,
+  [
+    "TimestampISO",
+    "Field",
+    "DeviationPct",
+    "BirdeyeValue",
+    "BitqueryValue",
+    "Token",
+  ].join(",") + "\n"
+);
 
 // ----------------------------------
 // Utility
@@ -26,12 +43,25 @@ function pctDiff(a, b) {
   return Math.abs(a - b) / ((a + b) / 2);
 }
 
+function appendDeviationRow({ ts, field, diff, birdeyeVal, bitqueryVal }) {
+  const iso = new Date(Number(ts)).toISOString();
+  const row = [
+    iso,
+    field,
+    (diff * 100).toFixed(6),
+    birdeyeVal,
+    bitqueryVal,
+    TOKEN,
+  ].join(",") + "\n";
+
+  fs.appendFileSync(OUT_FILE, row);
+}
+
 // ----------------------------------
 // Fetch Birdeye
 // ----------------------------------
 
 async function fetchBirdeye() {
-
   const to = toUnixSeconds(new Date());
   const from = to - HOURS * 3600;
 
@@ -42,21 +72,20 @@ async function fetchBirdeye() {
     headers: {
       "x-chain": CHAIN,
       accept: "application/json",
-      "X-API-KEY": BIRDEYE_API_KEY
-    }
+      "X-API-KEY": BIRDEYE_API_KEY,
+    },
   });
 
   const json = await res.json();
 
   const map = {};
-
   for (const item of json.data.items) {
     const ts = normalizeMinute(item.unixTime * 1000);
     map[ts] = {
       open: Number(item.o),
       high: Number(item.h),
       low: Number(item.l),
-      close: Number(item.c)
+      close: Number(item.c),
     };
   }
 
@@ -68,7 +97,6 @@ async function fetchBirdeye() {
 // ----------------------------------
 
 async function fetchBitquery() {
-
   const query = `
     query {
       Trading {
@@ -101,25 +129,23 @@ async function fetchBitquery() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${BITQUERY_TOKEN}`
+      Authorization: `Bearer ${BITQUERY_TOKEN}`,
     },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query }),
   });
 
   const json = await res.json();
 
   const map = {};
-
   const items = json.data?.Trading?.Tokens || [];
 
   for (const item of items) {
     const ts = normalizeMinute(item.Interval.Time.Start);
-
     map[ts] = {
       open: Number(item.Price.Ohlc.Open),
       high: Number(item.Price.Ohlc.High),
       low: Number(item.Price.Ohlc.Low),
-      close: Number(item.Price.Ohlc.Close)
+      close: Number(item.Price.Ohlc.Close),
     };
   }
 
@@ -131,10 +157,9 @@ async function fetchBitquery() {
 // ----------------------------------
 
 function compare(birdeye, bitquery) {
-
   const allTimestamps = new Set([
     ...Object.keys(birdeye),
-    ...Object.keys(bitquery)
+    ...Object.keys(bitquery),
   ]);
 
   let matched = 0;
@@ -148,7 +173,6 @@ function compare(birdeye, bitquery) {
   let anomalies = 0;
 
   for (const ts of allTimestamps) {
-
     const b = birdeye[ts];
     const q = bitquery[ts];
 
@@ -156,7 +180,6 @@ function compare(birdeye, bitquery) {
       birdeyeMissing++;
       continue;
     }
-
     if (!q) {
       bitqueryMissing++;
       continue;
@@ -168,15 +191,20 @@ function compare(birdeye, bitquery) {
 
     for (const f of fields) {
       const diff = pctDiff(b[f], q[f]);
-      if (diff !== null) {
+      if (diff === null) continue;
 
-        totalDiff[f] += diff;
-        maxDiff = Math.max(maxDiff, diff);
+      totalDiff[f] += diff;
+      maxDiff = Math.max(maxDiff, diff);
 
-        if (diff > DEVIATION_THRESHOLD) {
-          anomalies++;
-          console.log(`🚨 Deviation = ${(diff*100).toFixed(4)}% at ${new Date(Number(ts)).toISOString()} (${f})`);
-        }
+      if (diff > DEVIATION_THRESHOLD) {
+        anomalies++;
+        appendDeviationRow({
+          ts,
+          field: f,
+          diff,
+          birdeyeVal: b[f],
+          bitqueryVal: q[f],
+        });
       }
     }
 
@@ -184,7 +212,6 @@ function compare(birdeye, bitquery) {
   }
 
   console.log("\n===== DATA QUALITY REPORT =====\n");
-
   console.log("Matched candles:", matched);
   console.log("Birdeye missing:", birdeyeMissing);
   console.log("Bitquery missing:", bitqueryMissing);
@@ -199,6 +226,7 @@ function compare(birdeye, bitquery) {
 
   console.log("\nMax deviation observed:", (maxDiff * 100).toFixed(4) + "%");
   console.log("Total deviation anomalies (>2%):", anomalies);
+  console.log("Saved anomalies to:", OUT_FILE);
 }
 
 // ----------------------------------
@@ -207,7 +235,6 @@ function compare(birdeye, bitquery) {
 
 (async () => {
   try {
-
     console.log("Fetching Birdeye...");
     const birdeye = await fetchBirdeye();
 
@@ -215,7 +242,6 @@ function compare(birdeye, bitquery) {
     const bitquery = await fetchBitquery();
 
     compare(birdeye, bitquery);
-
   } catch (err) {
     console.error("Error:", err);
   }
