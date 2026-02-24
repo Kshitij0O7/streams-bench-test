@@ -1,15 +1,33 @@
 const fs = require("fs");
 const path = require("path");
 
-const filePath = path.join(__dirname, "latency.csv");
+const filePath = path.join(__dirname, "ohlcv_quality.csv");
 
-// Create file if not exists
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, "BlockTime,BirdeyeLatency,BitqueryLatency\n");
+  fs.writeFileSync(
+    filePath,
+    [
+      "StartTime",
+      "BirdeyeOpen","BirdeyeHigh","BirdeyeLow","BirdeyeClose",
+      "BitqueryOpen","BitqueryHigh","BitqueryLow","BitqueryClose"
+    ].join(",") + "\n"
+  );
 }
 
-function appendRow(blockTime, birdeyeLatency, bitqueryLatency) {
-  const row = `${blockTime},${birdeyeLatency || ""},${bitqueryLatency || ""}\n`;
+function val(x) {
+  return (x === null || x === undefined || Number.isNaN(x)) ? "" : x;
+}
+
+function appendRow(startTime, birdeye, bitquery) {
+  const b = birdeye || {};
+  const q = bitquery || {};
+
+  const row = [
+    startTime,
+    val(b.open), val(b.high), val(b.low), val(b.close),
+    val(q.open), val(q.high), val(q.low), val(q.close),
+  ].join(",") + "\n";
+
   fs.appendFileSync(filePath, row);
 }
 

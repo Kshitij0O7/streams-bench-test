@@ -4,38 +4,44 @@ function startBirdeyeStream(onData) {
   const client = new WebSocketClient();
 
   const apiKey = process.env.BIRDEYE_API_KEY;
-  const tokenAddress = process.env.TOKEN_ADDRESS;
   const chain = process.env.CHAIN;
 
   client.on('connect', function (connection) {
 
     connection.on('message', function (message) {
       if (message.type === 'utf8') {
-        const receivedAt = Date.now();
         const data = JSON.parse(message.utf8Data);
 
-        if (data?.data?.unixTime) {
-          const blockTime = data.data.unixTime * 1000;
-          const latency = receivedAt - blockTime;
-
-          const bucketSecond = blockTime/1000;
+        try {
+          const message = data.data;
+          const startTime = new Date(message.unixTime * 1000).toISOString();
+          const open = message.o;
+          const high = message.h;
+          const low = message.l;
+          const close = message.c;
 
           onData({
             provider: "birdeye",
-            bucketSecond,
-            latency
-          });
+            startTime,
+            open,
+            high,
+            low,
+            close
+          })
+        } catch (error) {
+          console.error(error);
         }
       }
     });
 
-    const msg = {  
-      "type": "SUBSCRIBE_BASE_QUOTE_PRICE",  
-      "data": {  
-        "baseAddress": "4nURS6qxY9bCEhramG2VZfnphJZyzis5EE86w5qLpump",  
-        "quoteAddress": "So11111111111111111111111111111111111111112",  
-        "chartType": "1m"  
-      }  
+    const msg = {
+      "type": "SUBSCRIBE_PRICE",
+      "data": {
+          "queryType": "simple",
+          "chartType": "1s",
+          "address": "DMYNp65mub3i7LRpBdB66CgBAceLcQnv4gsWeCi6pump",
+          "currency": "usd"
+      }
     };
 
     connection.send(JSON.stringify(msg));

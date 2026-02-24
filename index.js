@@ -3,86 +3,79 @@ require("dotenv").config();
 const startBirdeyeStream = require("./birdeyeStream");
 const startBitqueryStream = require("./bitqueryStream");
 const appendRow = require("./saveFile");
-const calculateAverages = require("./calculate");
+const calculateQuality = require("./calculate");
 
-/*
-  store structure:
-
-  {
-    [bucketSecond]: {
-        createdAt: timestamp,
-        birdeye: latency,
-        bitquery: latency
-    }
-  }
-*/
-
+/**
+ * store structure:
+ * {
+ *   [startTime]: {
+ *     createdAt: number,
+ *     birdeye: { open, high, low, close },
+ *     bitquery:{ open, high, low, close }
+ *   }
+ * }
+ */
 const store = {};
-const TIMEOUT_MS = 4000; // Flush bucket after 4 seconds if incomplete
+const TIMEOUT_MS = 4000;
 
-function handleData({ provider, bucketSecond, latency }) {
-
-  // Initialize bucket if not present
-  if (!store[bucketSecond]) {
-    store[bucketSecond] = {
-      createdAt: Date.now()
-    };
-  }
-
-  // Only store first latency per provider per second
-  if (store[bucketSecond][provider] === undefined) {
-    store[bucketSecond][provider] = latency;
-  }
-
-  checkAndFlush(bucketSecond);
+function normalizeOHLC({ open, high, low, close }) {
+  // Convert to numbers to avoid string compare issues
+  return {
+    open: open !== undefined ? Number(open) : null,
+    high: high !== undefined ? Number(high) : null,
+    low: low !== undefined ? Number(low) : null,
+    close: close !== undefined ? Number(close) : null,
+  };
 }
 
-function checkAndFlush(bucketSecond) {
-  const entry = store[bucketSecond];
+function handleData({ provider, startTime, open, high, low, close }) {
+  if (!startTime) return;
+
+  if (!store[startTime]) {
+    store[startTime] = { createdAt: Date.now() };
+  }
+
+  // only store first update per provider per startTime
+  if (store[startTime][provider] === undefined) {
+    store[startTime][provider] = normalizeOHLC({ open, high, low, close });
+  }
+
+  checkAndFlush(startTime);
+}
+
+function checkAndFlush(startTime) {
+  const entry = store[startTime];
   if (!entry) return;
 
   const hasBirdeye = entry.birdeye !== undefined;
   const hasBitquery = entry.bitquery !== undefined;
   const isTimedOut = Date.now() - entry.createdAt > TIMEOUT_MS;
 
-  // Flush if both providers responded OR timeout reached
   if ((hasBirdeye && hasBitquery) || isTimedOut) {
-
-    appendRow(
-      bucketSecond,
-      entry.birdeye,
-      entry.bitquery
-    );
-
-    delete store[bucketSecond];
+    appendRow(startTime, entry.birdeye, entry.bitquery);
+    delete store[startTime];
   }
 }
 
-// Periodic cleanup in case flush not triggered automatically
+// periodic cleanup
 setInterval(() => {
-  Object.keys(store).forEach(bucketSecond => {
-    checkAndFlush(bucketSecond);
-  });
+  Object.keys(store).forEach(checkAndFlush);
 }, 1000);
 
-// Start both streams simultaneously
+// start both streams
 startBirdeyeStream(handleData);
 startBitqueryStream(handleData);
 
-// Graceful shutdown
+// graceful shutdown
 process.on("SIGINT", () => {
-  console.log("\nStopping benchmark...");
+  console.log("\nStopping quality benchmark...");
 
-  // Flush any remaining buckets
-  Object.keys(store).forEach(bucketSecond => {
-    const entry = store[bucketSecond];
-    appendRow(
-      bucketSecond,
-      entry.birdeye,
-      entry.bitquery
-    );
+  // Flush remaining rows
+  Object.keys(store).forEach((startTime) => {
+    const entry = store[startTime];
+    appendRow(startTime, entry.birdeye, entry.bitquery);
   });
 
-  calculateAverages();
+  calculateQuality();
   process.exit();
 });

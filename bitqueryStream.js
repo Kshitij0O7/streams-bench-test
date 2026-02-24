@@ -3,10 +3,9 @@ const { WebSocket } = require("ws");
 function startBitqueryStream(onData) {
 
   const token = process.env.BITQUERY_TOKEN;
-  const tokenAddress = process.env.TOKEN_ADDRESS;
 
   const bitqueryConnection = new WebSocket(
-    `wss://streaming.bitquery.io/eap?token=${token}`,
+    `wss://streaming.bitquery.io/graphql?token=${token}`,
     ["graphql-ws"]
   );
 
@@ -23,55 +22,72 @@ function startBitqueryStream(onData) {
         id: "1",
         payload: {
           query: `
-          subscription {
-            Trading {
-              Pairs(
-                where: {Interval: {Time: {Duration: {eq: 1}}}, Token: {Address: {is: "4nURS6qxY9bCEhramG2VZfnphJZyzis5EE86w5qLpump"}}, QuoteToken: {Address: {is: "So11111111111111111111111111111111111111112"}}}
-              ) {
-                Block {
-                  Timestamp
-                }
-                Interval {
-                  Time {
-                    Start
-                    Duration
+            subscription {
+              Trading {
+                Tokens(
+                  where: {
+                    Interval: {Time: {Duration: {eq: 1}}},
+                    Token: {Address: {is: "DMYNp65mub3i7LRpBdB66CgBAceLcQnv4gsWeCi6pump"}}}
+                ) {
+                  Token {
+                    Address
+                    Symbol
                   }
-                }
-                Price {
-                  Ohlc {
-                    Open
-                    High
-                    Low
-                    Close
+                  Interval {
+                    Time {
+                      Start
+                    }
                   }
-                }
-                Volume {
-                  Usd
+                  Volume {
+                    Usd
+                  }
+                  Price {
+                    Ohlc {
+                      Close
+                      High
+                      Low
+                      Open
+                    }
+                  }
                 }
               }
             }
-          }
           `
         }
       }));
     }
 
     if (response.type === "data") {
-      const receivedAt = Date.now();
-      const startTime = response.payload.data.Trading.Pairs[0].Interval.Time.Start;
-      const timestamp = new Date(startTime).getTime();
+      const message = response.payload.data.Trading.Tokens[0];
+      
+      try {
+        const startTime = message.Interval.Time.Start;
+        const open = message.Price.Ohlc.Open;
+        const high = message.Price.Ohlc.High;
+        const low = message.Price.Ohlc.Low;
+        const close = message.Price.Ohlc.Close;
 
-      const latency = receivedAt - timestamp;
-
-      const bucketSecond = Math.floor(timestamp / 1000);
-
-      onData({
-        provider: "bitquery",
-        bucketSecond,
-        latency
-      });
+        // console.log({
+        //   provider: "bitquery",
+        //   startTime,
+        //   open,
+        //   high,
+        //   low,
+        //   close
+        // });
+        onData({
+          provider: "bitquery",
+          startTime,
+          open,
+          high,
+          low,
+          close
+        });
+      } catch (error) {
+        console.error(error);
+      }
     }
   });
 }
-
+// startBitqueryStream();
 module.exports = startBitqueryStream;
