@@ -7,11 +7,12 @@ const CHAIN = "solana";
 const BIRDEYE_API_KEY = process.env.BIRDEYE_API_KEY;
 const BITQUERY_TOKEN = process.env.BITQUERY_TOKEN;
 
-const HOURS = 48;
+const HOURS = 7;
 const DURATION_SECONDS = 60;
 const DEVIATION_THRESHOLD = 0.02; // 2% deviation considered anomaly
 
-const OUT_FILE = path.join(__dirname, "deviations2days.csv");
+// const OUT_FILE = path.join(__dirname, "deviations7hrs.csv");
+const OUT_FILE = path.join(__dirname, "deviations7hrsNative.csv");
 
 // Create file only if it does not exist
 if (!fs.existsSync(OUT_FILE)) {
@@ -127,27 +128,59 @@ async function fetchBitquery() {
     }
   `;
 
+  const nativeQuery = `
+    {
+        Solana {
+            DEXTradeByTokens(
+            orderBy: {ascendingByField: "Block_Timefield"}
+            where: {Trade: {Currency: {MintAddress: {is: "GJmF68t5HXM1U1j2nE4Trvh7vH5XeXys7MW4UN5Bpump"}}, PriceAsymmetry: {lt: 0.1}, Side: {Currency: {MintAddress: {is: "So11111111111111111111111111111111111111112"}}}}, Block: {Time: {since_relative: {hours_ago: 7}}}}
+            ) {
+                Block {
+                    Timefield: Time(interval: {in: minutes, count: 1})
+                }
+                volume: sum(of: Trade_Amount)
+                Trade {
+                    high: Price(maximum: Trade_Price)
+                    low: Price(minimum: Trade_Price)
+                    open: Price(minimum: Block_Slot)
+                    close: Price(maximum: Block_Slot)
+                }
+            }
+        }
+    }
+  `;
+
   const res = await fetch("https://streaming.bitquery.io/graphql", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${BITQUERY_TOKEN}`,
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ nativeQuery }),
   });
 
   const json = await res.json();
 
+  console.log(json);
   const map = {};
-  const items = json.data?.Trading?.Tokens || [];
+//   const items = json.data?.Trading?.Tokens || [];
+  const items = json.data?.Solana?.DEXTradeByTokens || [];
+
 
   for (const item of items) {
-    const ts = normalizeMinute(item.Interval.Time.Start);
+    // const ts = normalizeMinute(item.Interval.Time.Start);
+    // map[ts] = {
+    //   open: Number(item.Price.Ohlc.Open),
+    //   high: Number(item.Price.Ohlc.High),
+    //   low: Number(item.Price.Ohlc.Low),
+    //   close: Number(item.Price.Ohlc.Close),
+    // };
+    const ts = normalizeMinute(item.Block.Timefield);
     map[ts] = {
-      open: Number(item.Price.Ohlc.Open),
-      high: Number(item.Price.Ohlc.High),
-      low: Number(item.Price.Ohlc.Low),
-      close: Number(item.Price.Ohlc.Close),
+      open: Number(item.Trade.open),
+      high: Number(item.Trade.high),
+      low: Number(item.Trade.low),
+      close: Number(item.Trade.close),
     };
   }
 
